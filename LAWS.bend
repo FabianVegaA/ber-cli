@@ -2,6 +2,7 @@ import Base
 import ./src/Args.bend as Args
 import ./src/Input.bend as Input
 import ber-core-store@0.1.1.0/src/Value.bend as Value
+import ./src/Render.bend as Render
 
 # CLI laws land here, one family per task (Args, Input, Render).
 # Empty shell so the gate compiles before any law exists.
@@ -55,3 +56,37 @@ law input_bad_hex_is_none:
 
 law input_empty_blob_hex:
   {Input.source_to_value(Args.FromBlobHex{""}) == Some{Value.Blob{Nil{}}} : Maybe<&2, Value.Value>}
+
+# Render family: exit codes, plain renders, hints, JSON shapes.
+law exit_merge_success:
+  {Render.exit_code_of(Render.Merged{"c1"}) == (0 : U32) : U32}
+
+law exit_conflict:
+  {Render.exit_code_of(Render.Conflict{"2", "ledger/r1", "a", "b"}) == (10 : U32) : U32}
+
+law exit_unprovable:
+  {Render.exit_code_of(Render.Unprovable{"no-common-ancestor"}) == (20 : U32) : U32}
+
+law exit_absent:
+  {Render.exit_code_of(Render.Absent{"ledger/r1"}) == (30 : U32) : U32}
+
+law exit_usage:
+  {Render.exit_code_of(Render.UsageError{"unknown-command"}) == (2 : U32) : U32}
+
+law exit_ok:
+  {Render.exit_code_of(Render.Ok{"read=v1"}) == (0 : U32) : U32}
+
+law blob_never_expands:
+  {Render.render_human(Render.Ok{"read=<blob 3 bytes>"}, Render.plain_opts()) == "read=<blob 3 bytes>" : String}
+
+law conflict_hint_mentions_diff:
+  {Render.hint_for(Render.Conflict{"2", "ledger/r1", "a", "b"}) == "hint: ber diff --from a --to b --verbose" : String}
+
+law json_status_ok:
+  {Render.render_json(Render.Ok{"read=v1"}) == "{\"status\":\"ok\",\"output\":\"read=v1\"}" : String}
+
+law succeeded_ok:
+  {Render.succeeded(Render.Ok{"read=v1"}) == True{} : Bool}
+
+law succeeded_conflict_false:
+  {Render.succeeded(Render.Conflict{"2", "ledger/r1", "a", "b"}) == False{} : Bool}

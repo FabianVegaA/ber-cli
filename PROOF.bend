@@ -46,3 +46,36 @@ def Laws.input_bad_hex_is_none():
 
 def Laws.input_empty_blob_hex():
   {==}
+
+def Laws.exit_merge_success():
+  {==}
+
+def Laws.exit_conflict():
+  {==}
+
+def Laws.exit_unprovable():
+  {==}
+
+def Laws.exit_absent():
+  {==}
+
+def Laws.exit_usage():
+  {==}
+
+def Laws.exit_ok():
+  {==}
+
+def Laws.blob_never_expands():
+  {==}
+
+def Laws.conflict_hint_mentions_diff():
+  {==}
+
+def Laws.json_status_ok():
+  {==}
+
+def Laws.succeeded_ok():
+  {==}
+
+def Laws.succeeded_conflict_false():
+  {==}
