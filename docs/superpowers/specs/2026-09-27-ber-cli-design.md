@@ -87,8 +87,12 @@ src/Args.bend       # PURO: List String -> Command (Data). Sin IO ni Store.
 src/Input.bend      # PURO: flags de valor -> Value. Sin IO (bytes ya leídos).
 src/Render.bend     # PURO: Command/Result -> String humano / JSON / hint / exit-code.
 src/Run.bend        # FINO: Command -> Store.Op delegando 1:1 a Ber.*. Solo orquestación.
-LAWS.bend / PROOF.bend / tests/*_check.bend / bolt.bend
+LAWS.bend / PROOF.bend / bolt.bend
 ```
+
+Sin tests por decisión explícita: verificación = `bend PROOF.bend` verde +
+`bolt` 0 errores + smoke manual del binario (§9). El shell de efectos (`Run` +
+`cli.bend`) se valida ejecutándolo, no con `*_check.bend`.
 
 Bordes: solo `Run.bend` + `cli.bend` tocan `Store`/`IO`/`File`. `Args/Input/Render`
 puros, probables y paralelizables (`!` en renders de listas grandes).
