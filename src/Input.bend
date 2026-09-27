@@ -1,7 +1,7 @@
 import Base
 import ./Args.bend as Args
-import ber-core-store@0.1.1.0/src/Value.bend as Value
-import ber-core-store@0.1.1.0/src/JsonAdapter.bend as JsonAdapter
+import ber-core-store@0.1.2.0/src/Value.bend as Value
+import ber-core-store@0.1.2.0/src/JsonAdapter.bend as JsonAdapter
 import bend-kit-json@0.3.0.0/json.bend as Json
 
 # Pure flag→Value mapping. Files need IO so FromFile always answers None

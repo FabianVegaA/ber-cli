@@ -1,6 +1,6 @@
 import Base
-import ber-core-store@0.1.1.0/src/LogicalKey.bend as LogicalKey
-import ber-core-store@0.1.1.0/src/Comparison.bend as Comparison
+import ber-core-store@0.1.2.0/src/LogicalKey.bend as LogicalKey
+import ber-core-store@0.1.2.0/src/Comparison.bend as Comparison
 
 # Pure presentation: every CLI result maps to exactly one Outcome; Run owns
 # the Ber.* → Outcome mapping, this module owns Outcome → text/code/hint.
@@ -89,22 +89,34 @@ def hint_for(outcome: Outcome) -> String:
     case Merged{commit_id}:
       ""
 
-def render_human(outcome: Outcome, +opts: HumanOpts) -> String:
+def color_wrap(color_on: Bool, +code: String, +text: String) -> String:
+  match color_on:
+    case True{}:
+      "\u{1B}[" ++ code ++ "m" ++ text ++ "\u{1B}[0m"
+    case False{}:
+      text
+
+def render_human_colored(outcome: Outcome, color_on: Bool) -> String:
   match outcome:
     case Ok{text}:
       text
     case Merged{commit_id}:
-      "merged:" ++ commit_id
+      color_wrap(color_on, "32", "merged:") ++ commit_id
     case Conflict{count_text, keys_text, first_id, second_id}:
-      "conflict:" ++ count_text ++ " " ++ keys_text ++ "\n" ++ hint_conflict(first_id, second_id)
+      color_wrap(color_on, "31", "conflict:") ++ count_text ++ " " ++ keys_text ++ "\n" ++ hint_conflict(first_id, second_id)
     case Unprovable{+reason}:
-      "unprovable:" ++ reason ++ "\n" ++ hint_unprovable(reason)
+      color_wrap(color_on, "33", "unprovable:") ++ reason ++ "\n" ++ hint_unprovable(reason)
     case Absent{what}:
       "absent:" ++ what ++ "\n" ++ "hint: check --ns/--record/--at; absent reads exit 30"
     case UsageError{message}:
       "usage-error:" ++ message ++ "\n" ++ "hint: ber --help"
     case IoError{message}:
       "io-error:" ++ message ++ "\n" ++ "hint: check --store dir and file permissions"
+
+def render_human(outcome: Outcome, +opts: HumanOpts) -> String:
+  match opts:
+    case Human{color_on, verbose}:
+      render_human_colored(outcome, color_on)
 
 def render_json(outcome: Outcome) -> String:
   match outcome:

@@ -1,9 +1,9 @@
 import Base
 import ./src/Args.bend as Args
 import ./src/Input.bend as Input
-import ber-core-store@0.1.1.0/src/Value.bend as Value
+import ber-core-store@0.1.2.0/src/Value.bend as Value
 import ./src/Render.bend as Render
-import ber-core-store@0.1.1.0/src/LogicalKey.bend as LogicalKey
+import ber-core-store@0.1.2.0/src/LogicalKey.bend as LogicalKey
 
 # CLI laws land here, one family per task (Args, Input, Render).
 # Empty shell so the gate compiles before any law exists.
@@ -133,3 +133,15 @@ law render_key_list_two:
 # no keys render empty.
 law render_key_list_empty:
   {Render.render_key_list(Nil{}) == "" : String}
+
+# Colored merge wraps the verdict in green.
+law colored_merge_wraps:
+  {Render.render_human(Render.Merged{"c1"}, Render.Human{True{}, False{}}) == "[32mmerged:[0mc1" : String}
+
+# commit create threads a single parent.
+law parse_commit_create_parent:
+  {Args.parse_command(Con{"commit", Con{"create", Con{"--parent", Con{"p1", Nil{}}}}}) == Args.CommitCreate{"", Con{"p1", Nil{}}, Nil{}} : Args.Command}
+
+# --help flag is an alias for help.
+law parse_help_flag_alias:
+  {Args.parse_command(Con{"--help", Nil{}}) == Args.Help{""} : Args.Command}

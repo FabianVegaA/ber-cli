@@ -91,3 +91,12 @@ def Laws.render_key_list_two():
 
 def Laws.render_key_list_empty():
   {==}
+
+def Laws.colored_merge_wraps():
+  {==}
+
+def Laws.parse_commit_create_parent():
+  {==}
+
+def Laws.parse_help_flag_alias():
+  {==}

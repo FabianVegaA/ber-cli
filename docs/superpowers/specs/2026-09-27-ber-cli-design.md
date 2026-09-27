@@ -20,7 +20,7 @@ y errores que guían al siguiente paso.
 ## 3. Stack y workflow
 
 - Bend puro, ber-core como dependencia publicada:
-  `import ber-core-store@0.1.1.0/ber.bend as Ber` (pins heredados: mylsm,
+  `import ber-core-store@0.1.2.0/ber.bend as Ber` (pins heredados: mylsm,
   bend-kit-json, bend-codec-lib, SHA vendored).
 - Proof-driven (heredado de `AGENT.md`): leyes en `LAWS.bend`, código + prueba
   en `PROOF.bend`, tests (`tests/*_check.bend`) SOLO para IO/Sess wiring.
@@ -31,19 +31,21 @@ y errores que guían al siguiente paso.
 ## 4. Superficie de comandos
 
 Flags globales: `--store DIR` (default `./.ber`), `--session ID`, `--json`
-(salida máquina), `--no-color`, `--verbose`, `--help`.
+(salida máquina), `--colors` (opt-in: colorea veredictos con ANSI; por defecto
+salida plana), `--verbose`, `--help`. `--help` y `-h` son alias de `help`.
+`--parent` es singular (historia lineal); multi-parent queda para v2.
 
 | Subcomando | Delegación ber-core |
 |---|---|
 | `record put --session S --ns N --record R (--text T \| --json J \| --blob-hex H \| --file F [--kind text\|json\|blob])` | `Ber.put_record` |
 | `record rm --session S --ns N --record R` | `Ber.delete_record` |
 | `record get --ns N --record R --at COMMIT` | `Ber.read_value_at` + `render_read_value` |
-| `commit create --session S [--parent P...] [--meta k=v...]` | `Ber.create_commit` |
+| `commit create --session S [--parent P] [--meta k=v...]` (meta diferido a v2) | `Ber.create_commit` (metas Nil) |
 | `commit show-tree --at COMMIT` | `Ber.read_tree_at` |
 | `diff --from A --to B [--verbose]` | `Ber.compare_commits` + `render_compare_counts` (+ detalle por clave en verbose) |
 | `merge --first A --second B [--strategy union-disjoint]` | `Ber.merge_commits` + `verify_merge_outcome` |
 | `certificate verify --first A --second B --base C --tree H --strategy S [--law name=pass...]` | `Ber.verify_certificate` |
-| `write --session S --ns N --record R ... --parents ...` (atajo) | `Ber.commit_value` / `Ber.remove_record` |
+| `write --session S --ns N --record R ... [--parent P]` (atajo) | `Ber.commit_value` / `Ber.remove_record` |
 | `compare --from A --to B` (atajo) | `Ber.compare_summary` |
 | `merge-verify --first A --second B` (atajo) | `Ber.merge_and_verify` |
 
@@ -64,9 +66,10 @@ Flags globales: `--store DIR` (default `./.ber`), `--session ID`, `--json`
 
 ## 6. Salida y exit codes
 
-- Humana por defecto, reutilizando `render_*` de ber-core + color ANSI
-  (desactivable con `--no-color`) y detalle `--verbose` en `diff`
-  (lista de claves added/removed/modified).
+- Humana por defecto, reutilizando `render_*` de ber-core. Con `--colors` los
+  veredictos se colorean (verde `merged:`, rojo `conflict:`, amarillo
+  `unprovable:`); sin el flag la salida es plana (apta para tuberías y logs).
+- Con `--verbose`, `diff` añade el detalle por clave (added/removed/modified).
 - `--json` emite JSON canónico de una sola línea: `{"status":...,...}` con
   `status ∈ {ok, merged, conflict, unprovable, absent, usage-error, io-error}`.
 - Blobs muestran `<blob N bytes>`, nunca bytes crudos (hereda
@@ -82,7 +85,7 @@ Flags globales: `--store DIR` (default `./.ber`), `--session ID`, `--json`
 ## 7. Arquitectura
 
 ```
-cli.bend            # main: IO.args -> Args.parse -> Run.dispatch -> Render -> print/exit
+cli.bend            # main: IO.args -> Args.parse_both -> Run.dispatch -> Render -> print/exit/die
 src/Args.bend       # PURO: List String -> Command (Data). Sin IO ni Store.
 src/Input.bend      # PURO: flags de valor -> Value. Sin IO (bytes ya leídos).
 src/Render.bend     # PURO: Command/Result -> String humano / JSON / hint / exit-code.
@@ -91,8 +94,9 @@ LAWS.bend / PROOF.bend / bolt.bend
 ```
 
 Sin tests por decisión explícita: verificación = `bend PROOF.bend` verde +
-`bolt` 0 errores + smoke manual del binario (§9). El shell de efectos (`Run` +
-`cli.bend`) se valida ejecutándolo, no con `*_check.bend`.
+`bolt` 0 errores + smoke manual del binario (§9, cross-process sobre un
+mismo `--store`). El shell de efectos (`Run` + `cli.bend`) se valida
+ejecutándolo, no con `*_check.bend`.
 
 Bordes: solo `Run.bend` + `cli.bend` tocan `Store`/`IO`/`File`. `Args/Input/Render`
 puros, probables y paralelizables (`!` en renders de listas grandes).

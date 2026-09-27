@@ -258,10 +258,20 @@ def parse_commit_is_show_tree(is_show_tree: Bool, +flag_map: Map<&2, String>) ->
     case False{}:
       UsageError{"unknown-commit-subcommand"}
 
+def parse_parent_list_go(parent_missing: Bool, +parent_val: String) -> List<&2, String>:
+  match parent_missing:
+    case True{}:
+      Nil{}
+    case False{}:
+      Con{parent_val, Nil{}}
+
+def parse_parent_list(+parent_val: String) -> List<&2, String>:
+  parse_parent_list_go(String.eq(parent_val, ""), parent_val)
+
 def parse_commit_is_create(is_create: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_create:
     case True{}:
-      CommitCreate{flag_at(flag_map, "--session"), Nil{}, Nil{}}
+      CommitCreate{flag_at(flag_map, "--session"), parse_parent_list(flag_at(flag_map, "--parent")), Nil{}}
     case False{}:
       parse_commit_is_show_tree(String.eq(sub_word, "show-tree"), flag_map)
 
@@ -308,7 +318,7 @@ def parse_is_compare(+flag_map: Map<&2, String>) -> Command:
   Compare{flag_at(flag_map, "--from"), flag_at(flag_map, "--to")}
 
 def parse_is_write(+flag_map: Map<&2, String>) -> Command:
-  Write{flag_at(flag_map, "--session"), flag_at(flag_map, "--ns"), flag_at(flag_map, "--record"), parse_source(flag_map), Nil{}}
+  Write{flag_at(flag_map, "--session"), flag_at(flag_map, "--ns"), flag_at(flag_map, "--record"), parse_source(flag_map), parse_parent_list(flag_at(flag_map, "--parent"))}
 
 def parse_is_merge(+flag_map: Map<&2, String>) -> Command:
   Merge{flag_at(flag_map, "--first"), flag_at(flag_map, "--second"), "union-disjoint"}
@@ -395,8 +405,22 @@ def parse_split_empty(head_missing: Bool, +head_word: String, +sub_word: String,
     case False{}:
       parse_dispatch(String.eq(head_word, "record"), String.eq(head_word, "commit"), String.eq(head_word, "certificate"), String.eq(head_word, "diff"), String.eq(head_word, "merge"), String.eq(head_word, "write"), String.eq(head_word, "compare"), String.eq(head_word, "merge-verify"), String.eq(head_word, "help"), sub_word, flag_map)
 
+def parse_split_head_alias_h(is_h_flag: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_h_flag:
+    case True{}:
+      parse_is_help(flag_map)
+    case False{}:
+      parse_split_empty(String.eq(head_word, ""), head_word, sub_word, flag_map)
+
+def parse_split_head_alias(is_help_flag: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_help_flag:
+    case True{}:
+      parse_is_help(flag_map)
+    case False{}:
+      parse_split_head_alias_h(String.eq(head_word, "-h"), head_word, sub_word, flag_map)
+
 def parse_split_head(+head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
-  parse_split_empty(String.eq(head_word, ""), head_word, sub_word, flag_map)
+  parse_split_head_alias(String.eq(head_word, "--help"), head_word, sub_word, flag_map)
 
 def parse_split(+split: ArgvSplit) -> Command:
   match split:
