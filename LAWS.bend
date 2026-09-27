@@ -90,3 +90,9 @@ law succeeded_ok:
 
 law succeeded_conflict_false:
   {Render.succeeded(Render.Conflict{"2", "ledger/r1", "a", "b"}) == False{} : Bool}
+
+law session_cmd_wins:
+  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}}, "s1") == "s1" : String}
+
+law session_opts_fallback:
+  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}}, "") == "s2" : String}

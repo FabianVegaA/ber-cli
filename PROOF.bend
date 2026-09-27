@@ -79,3 +79,9 @@ def Laws.succeeded_ok():
 
 def Laws.succeeded_conflict_false():
   {==}
+
+def Laws.session_cmd_wins():
+  {==}
+
+def Laws.session_opts_fallback():
+  {==}
