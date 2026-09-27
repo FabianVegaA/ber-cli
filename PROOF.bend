@@ -85,3 +85,9 @@ def Laws.session_cmd_wins():
 
 def Laws.session_opts_fallback():
   {==}
+
+def Laws.render_key_list_two():
+  {==}
+
+def Laws.render_key_list_empty():
+  {==}

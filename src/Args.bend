@@ -429,3 +429,10 @@ def parse_opts(argv: List<String>) -> GlobalOpts:
 
 def usage_text(+topic: String) -> String:
   "ber record put --ns N --record R (--text T | --json J | --blob-hex H | --file F --kind K)\nber record get --ns N --record R --at COMMIT\nber diff --from A --to B [--verbose]\nber merge --first A --second B\nber --help"
+
+# Both halves from one argv pass: the split is Data so it can be reused.
+def parse_both_go(+split: ArgvSplit) -> Sigma<&2, &2, GlobalOpts, _ => Command>:
+  (parse_opts_split(split), parse_split(split))
+
+def parse_both(argv: List<String>) -> Sigma<&2, &2, GlobalOpts, _ => Command>:
+  parse_both_go(args_to_split(argv))

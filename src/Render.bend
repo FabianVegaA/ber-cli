@@ -1,4 +1,6 @@
 import Base
+import ber-core-store@0.1.1.0/src/LogicalKey.bend as LogicalKey
+import ber-core-store@0.1.1.0/src/Comparison.bend as Comparison
 
 # Pure presentation: every CLI result maps to exactly one Outcome; Run owns
 # the Ber.* → Outcome mapping, this module owns Outcome → text/code/hint.
@@ -127,3 +129,33 @@ def render_outcome(outcome: Outcome, json_out: Bool, +opts: HumanOpts) -> String
       render_json(outcome)
     case False{}:
       render_human(outcome, opts)
+
+# Space-joined "ns/record" list; empty reads as "".
+def render_key_list_tail(+tail_keys: List<&2, LogicalKey.LogicalKey>, +acc: String) -> String:
+  match tail_keys:
+    case Nil{}:
+      acc
+    case Con{head_key, rest_keys}:
+      render_key_list_tail(rest_keys, acc ++ " " ++ LogicalKey.encode_logical_key(head_key))
+
+def render_key_list(keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  match keys:
+    case Nil{}:
+      ""
+    case Con{head_key, tail_keys}:
+      render_key_list_tail(tail_keys, LogicalKey.encode_logical_key(head_key))
+
+def render_modified_line(+entry: Comparison.ModifiedEntry) -> String:
+  match entry:
+    case Comparison.Changed{changed_key, before_hash, after_hash}:
+      "\nmodified:" ++ LogicalKey.encode_logical_key(changed_key) ++ " " ++ before_hash ++ "->" ++ after_hash
+
+def render_modified_go(+entries: List<&2, Comparison.ModifiedEntry>, +acc: String) -> String:
+  match entries:
+    case Nil{}:
+      acc
+    case Con{head_entry, rest_entries}:
+      render_modified_go(rest_entries, acc ++ render_modified_line(head_entry))
+
+def render_modified_detail(+entries: List<&2, Comparison.ModifiedEntry>) -> String:
+  render_modified_go(entries, "")
