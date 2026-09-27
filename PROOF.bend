@@ -34,3 +34,15 @@ def Laws.colors_flag_on():
 
 def Laws.colors_flag_default_off():
   {==}
+
+def Laws.input_text_roundtrip(content):
+  {==}
+
+def Laws.input_file_is_none(file_path, kind_name):
+  {==}
+
+def Laws.input_bad_hex_is_none():
+  {==}
+
+def Laws.input_empty_blob_hex():
+  {==}

@@ -1,5 +1,7 @@
 import Base
 import ./src/Args.bend as Args
+import ./src/Input.bend as Input
+import ber-core-store@0.1.1.0/src/Value.bend as Value
 
 # CLI laws land here, one family per task (Args, Input, Render).
 # Empty shell so the gate compiles before any law exists.
@@ -37,3 +39,19 @@ law colors_flag_on:
 
 law colors_flag_default_off:
   {Args.colors_flag_of(Args.parse_opts(Nil{})) == False{} : Bool}
+
+# Input family: pure flag→Value mapping instances.
+law input_text_roundtrip:
+  for content: String
+  {Input.source_to_value(Args.FromText{content}) == Some{Value.Text{content}} : Maybe<&2, Value.Value>}
+
+law input_file_is_none:
+  for file_path: String
+  for kind_name: String
+  {Input.source_to_value(Args.FromFile{file_path, kind_name}) == None{} : Maybe<&2, Value.Value>}
+
+law input_bad_hex_is_none:
+  {Input.source_to_value(Args.FromBlobHex{"zz"}) == None{} : Maybe<&2, Value.Value>}
+
+law input_empty_blob_hex:
+  {Input.source_to_value(Args.FromBlobHex{""}) == Some{Value.Blob{Nil{}}} : Maybe<&2, Value.Value>}
