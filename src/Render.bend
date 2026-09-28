@@ -174,7 +174,7 @@ def render_modified_detail(+entries: List<&2, Comparison.ModifiedEntry>) -> Stri
 
 # Pinned to pack.json name@version; bump together.
 def version_text() -> String:
-  "ber-cli 0.2.0.0"
+  "ber-cli 0.2.1.0"
 
 # Friendly header: box-drawing logo on TTY, plain fallback otherwise.
 # English only; Ok{text} never carries ANSI (existing laws untouched).

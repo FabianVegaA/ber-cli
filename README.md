@@ -28,15 +28,24 @@ commits content-addressed; `bend-kit-json` parses documents.
 
 ## Install / Build
 
-Prerequisites: [Bend](https://bend-lang.com) 2.0.x (`bend version`).
+Prerequisites: [Bend](https://bend-lang.com) >= 2.0.32 (`bend version`).
+2.0.32 changed `IO.args()` to include `argv[0]`; the CLI strips it, so older
+toolchains build binaries that misparse every command.
 
 ```bash
 git clone <repo> ber-cli && cd ber-cli
 bend cli.bend -o ber        # build the binary (./ber)
 export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
-ber --version               # check the install: ber-cli 0.2.0.0
-bend PROOF.bend             # gate: must print "All terms check."
+ber --version               # check the install: ber-cli 0.2.1.0
+for f in src/Args.bend src/Key.bend; do bend $f --check-only; done   # gate: ALL PROOFS CHECK
 ```
+
+Pure modules certify under `bend ... --check-only`. The full
+`bend PROOF.bend` verdict additionally demands kernel certification of
+foreign code: since 2.0.32 it fails closed on `ber-core`'s `Fs`/JSON foreign
+imports (pre-existing — fails identically on a clean checkout), so the
+effects shell (`Run`) is covered by binary smoke instead (see
+`docs/superpowers/plans/2026-09-28-ber-cli-friendly.md`, Task 6).
 
 No `npm install`, no dependencies to fetch: `ber-core-store` and pins resolve
 through Bend packages. Put `./ber` on your `PATH` or call it by path; per-command
