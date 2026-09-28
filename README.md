@@ -8,38 +8,73 @@ Built on `ber-core-store@0.1.2.0` (pins inherited: mylsm, bend-kit-json, bend-co
 
 ```bash
 bend cli.bend -o ber
-export S=/tmp/ber-demo
+export S=./.ber-shop
 
-./ber write --store $S --session s1 --ns ledger --record r1 --text v1 --parents
-# committed:<BASE>
+BASE=$(./ber write --store $S --session ana --ns shop-config --record limits --json '{"max_items": 50}' --parents | sed 's/committed://')
 
-A=$(./ber write --store $S --session s1 --ns ledger --record r1 --text v2 --parent <BASE> | sed 's/committed://')
-C=$(./ber write --store $S --session s1 --ns ledger --record r2 --text w1 --parent <BASE> | sed 's/committed://')
+A=$(./ber write --store $S --session ana --ns shop-config --record limits --json '{"max_items": 100}' --parent $BASE | sed 's/committed://')
+C=$(./ber write --store $S --session bea --ns shop-config --record banner --text "sale" --parent $BASE | sed 's/committed://')
 
-./ber record get --store $S --ns ledger --record r1 --at $A   # read=v2
+./ber record get --store $S --ns shop-config --record limits --at $A   # read={"max_items":100}
 ./ber diff --store $S --from $A --to $C --verbose
 ./ber merge --store $S --first $A --second $C                 # merged:<id>, exit 0
 ```
 
 State is durable: every command replays `<store>/wal.log` on open and flushes its journal with fsync, so separate processes share state.
 
+```mermaid
+flowchart LR
+    subgraph session["session (staging)"]
+        PUT["record put / rm"]
+    end
+    COMMIT["commit create"] --> SNAP["commit <hash>\n+ parents"]
+    PUT --> COMMIT
+    SNAP --> GET["record get --at"]
+    A2["commit A"] --> MERGE["merge"]
+    B2["commit B"] --> MERGE
+    MERGE --> OK["merged:<id>"]
+    MERGE --> CF["conflict → diff --verbose"]
+    MERGE --> UP["unprovable → show-tree"]
+```
+
+## Concepts
+
+- **session**: id of the uncommitted working set (`stage/{session}/…` in ber-core). `record put`/`rm` write into the session; `commit create` materializes it into a commit. Nothing is visible to `record get` until committed. That is why the quickstart passes `--session ana` to both `write` steps.
+- **ns (namespace)**: first segment of the logical key; groups records by area (e.g. `shop-config`, `shop-prices`). The full logical key is `ns/record`.
+- **record**: id of the record inside the namespace; the versioned unit (each commit stores one value or tombstone per key, e.g. `shop-config/limits`).
+- **commit**: content-addressed snapshot (id = hash). `record get --at COMMIT` reads the value in force at that commit; `--parent` links linear history so `merge` can find a common ancestor.
+
+## Storing files
+
+- `--file F --kind text`: reads UTF-8 → `Text`.
+- `--file F --kind json`: parses → `Object` (structured document).
+- `--file F --kind blob`: reads raw bytes → `Blob` (generic binary: images, PDFs, …). Single reads are capped at 1 MiB.
+- Inline alternatives without a file: `--text`, `--json`, `--blob-hex`.
+- Blobs never dump bytes to the output: `read=<blob N bytes>`; bad `--kind` → usage-error (2), unreadable file → io-error (3).
+
+```bash
+./ber record put --store $S --session ana --ns product-media --record sku-42-front --file ./front.jpg --kind blob
+./ber commit create --store $S --session ana
+./ber record get --store $S --ns product-media --record sku-42-front --at <COMMIT>   # read=<blob 18432 bytes>
+```
+
 ## Commands
 
 Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--colors` (opt-in ANSI), `--verbose`, `--help` (`--help`/`-h` alias). `--parent` is singular (linear history); `--meta` deferred to v2.
 
-| Subcommand | Delegates to |
-|---|---|
-| `record put --session S --ns N --record R (--text T \| --json J \| --blob-hex H \| --file F [--kind text\|json\|blob])` | `Ber.put_record` |
-| `record rm --session S --ns N --record R` | `Ber.delete_record` |
-| `record get --ns N --record R --at COMMIT` | `Ber.read_value_at` + `render_read_value` |
-| `commit create --session S [--parent P]` | `Ber.create_commit` |
-| `commit show-tree --at COMMIT` | `Ber.read_tree_at` |
-| `diff --from A --to B [--verbose]` | `Ber.compare_commits` + `render_compare_counts` |
-| `merge --first A --second B [--strategy union-disjoint]` | `Ber.merge_commits` + verify |
-| `certificate verify --first A --second B --base C --tree H --strategy S` | `Ber.verify_certificate` |
-| `write --session S --ns N --record R ... [--parent P]` | `Ber.commit_value` |
-| `compare --from A --to B` | `Ber.compare_summary` |
-| `merge-verify --first A --second B` | `Ber.merge_and_verify` |
+| Subcommand | Delegates to | Description |
+|---|---|---|
+| `record put --session S --ns N --record R (--text T \| --json J \| --blob-hex H \| --file F [--kind text\|json\|blob])` | `Ber.put_record` | Stages one value in the session working set (invisible until commit) |
+| `record rm --session S --ns N --record R` | `Ber.delete_record` | Stages a tombstone; the deletion takes effect at commit |
+| `record get --ns N --record R --at COMMIT` | `Ber.read_value_at` + `render_read_value` | Reads a namespaced value as of a commit |
+| `commit create --session S [--parent P]` | `Ber.create_commit` | Materializes the session stage plus parents into a new commit |
+| `commit show-tree --at COMMIT` | `Ber.read_tree_at` | Shows the tree hash and entry count of a commit |
+| `diff --from A --to B [--verbose]` | `Ber.compare_commits` + `render_compare_counts` | Counts added/removed/modified keys between two commits (`--verbose` lists them) |
+| `merge --first A --second B [--strategy union-disjoint]` | `Ber.merge_commits` + verify | Three-way union-disjoint merge plus verification; prints merged, conflict or unprovable |
+| `certificate verify --first A --second B --base C --tree H --strategy S` | `Ber.verify_certificate` | Re-verifies a merge certificate against the stored trees |
+| `write --session S --ns N --record R ... [--parent P]` | `Ber.commit_value` | Shortcut: stage and commit in one step, prints the new commit id |
+| `compare --from A --to B` | `Ber.compare_summary` | Shortcut: diff rendered as a single counts line |
+| `merge-verify --first A --second B` | `Ber.merge_and_verify` | Shortcut: merge plus verify rendered as a verdict |
 
 Only `union-disjoint` is accepted as strategy; anything else answers `unprovable:unknown-strategy`.
 
