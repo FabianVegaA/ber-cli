@@ -164,6 +164,12 @@ def Laws.parse_version_short():
 def Laws.version_text_pinned():
   {==}
 
+def Laws.strip_argv0_drops_head():
+  {==}
+
+def Laws.strip_argv0_empty():
+  {==}
+
 def Laws.welcome_plain_has_next_step():
   {==}
 

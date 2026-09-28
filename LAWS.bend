@@ -211,7 +211,13 @@ law parse_version_short:
   {Args.parse_command(Con{"-V", Nil{}}) == Args.Version{} : Args.Command}
 
 law version_text_pinned:
-  {Render.version_text() == "ber-cli 0.2.0.0" : String}
+  {Render.version_text() == "ber-cli 0.2.1.0" : String}
+
+law strip_argv0_drops_head:
+  {Run.strip_argv0(Con{"prog", Con{"init", Nil{}}}) == Con{"init", Nil{}} : List<String>}
+
+law strip_argv0_empty:
+  {Run.strip_argv0(Nil{}) == Nil{} : List<String>}
 
 # Friendly render: welcome header, table diff, tree view.
 law welcome_plain_has_next_step:

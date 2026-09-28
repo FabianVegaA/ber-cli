@@ -866,5 +866,14 @@ def run_argv_go(+both: Sigma<&2, &2, Args.GlobalOpts, _ => Args.Command>) -> IO(
     case (opts, cmd):
       run_argv_exec(opts, cmd)
 
+# Bend >= 2.0.32 passes argv[0] (program path) in IO.args(); older toolchains
+# did not. The parser takes user args only, so the head token always drops.
+def strip_argv0(argv: List<String>) -> List<String>:
+  match argv:
+    case Nil{}:
+      Nil{}
+    case Con{head_arg, tail_args}:
+      tail_args
+
 def run_argv(argv: List<String>) -> IO(Unit):
-  run_argv_go(Args.parse_both(argv))
+  run_argv_go(Args.parse_both(strip_argv0(argv)))
