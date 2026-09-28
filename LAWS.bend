@@ -211,7 +211,7 @@ law parse_version_short:
   {Args.parse_command(Con{"-V", Nil{}}) == Args.Version{} : Args.Command}
 
 law version_text_pinned:
-  {Render.version_text() == "ber-cli 0.1.0.0" : String}
+  {Render.version_text() == "ber-cli 0.2.0.0" : String}
 
 # Friendly render: welcome header, table diff, tree view.
 law welcome_plain_has_next_step:

@@ -34,7 +34,7 @@ Prerequisites: [Bend](https://bend-lang.com) 2.0.x (`bend version`).
 git clone <repo> ber-cli && cd ber-cli
 bend cli.bend -o ber        # build the binary (./ber)
 export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
-ber --version               # check the install: ber-cli 0.1.0.0
+ber --version               # check the install: ber-cli 0.2.0.0
 bend PROOF.bend             # gate: must print "All terms check."
 ```
 

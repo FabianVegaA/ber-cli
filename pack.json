@@ -1,6 +1,6 @@
 {
   "name": "ber-cli",
   "description": "CLI mirror of the ber-core public API: content-addressed records, commits, diffs, verified merges.",
-  "import": "import ber-cli@0.1.0.0/cli.bend as BerCli",
+  "import": "import ber-cli@0.2.0.0/cli.bend as BerCli",
   "category": "packages"
 }
