@@ -36,7 +36,7 @@ toolchains build binaries that misparse every command.
 git clone <repo> ber-cli && cd ber-cli
 bend cli.bend -o ber        # build the binary (./ber)
 export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
-ber --version               # check the install: ber-cli 0.2.1.0
+ber --version               # check the install: ber-cli 0.2.2.0
 for f in src/Args.bend src/Key.bend; do bend $f --check-only; done   # gate: ALL PROOFS CHECK
 ```
 
@@ -70,9 +70,10 @@ set.
 Shortcuts: `set` = `write`, `get` = `record get`. The key goes in a single
 `ns/record` arg (`:` is not a separator). `get` without `--at` reads the last
 commit recorded in `./.ber/LOG` (best-effort journal: pass `--at` explicitly
-in scripts). Color is opt-in via `--colors`, auto-disabled by `NO_COLOR=1`,
-`TERM=dumb`, `--no-colors` or `--json` (pipes stay clean). `--colors` forces
-it. The `init` logo shows unless `TERM=dumb`, `LANG=C` or `--json`.
+in scripts). Colors are on by default, turned off by `NO_COLOR=1`,
+`TERM=dumb`, `--no-colors` or `--json` (pipes stay clean only when one of
+those applies). `--colors` is accepted for compatibility but is a no-op. The `init` logo shows unless `TERM=dumb`, the locale is not UTF-8
+(POSIX precedence: `LC_ALL` → `LC_CTYPE` → `LANG`, checked for `UTF-8`), or `--json`.
 
 Advanced reference with `--ns/--record` flags (still supported):
 
@@ -112,7 +113,7 @@ ber record get --ns product-media --record sku-42-front --at <COMMIT>   # read=<
 
 ## Commands
 
-Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--colors` (opt-in ANSI; auto-off with `NO_COLOR=1`, `TERM=dumb`, `--json`), `--no-colors` (force plain), `--verbose`, `--help` (`--help`/`-h` alias). `--parent` is singular (linear history); `--meta` deferred to v2.
+Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--colors` (compat no-op; colors are on by default), `--no-colors` (force plain; also `NO_COLOR=1`, `TERM=dumb`, `--json`), `--verbose`, `--help` (`--help`/`-h` alias). `--parent` is singular (linear history); `--meta` deferred to v2.
 
 | Subcommand | Delegates to | Description |
 |---|---|---|

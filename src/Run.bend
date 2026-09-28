@@ -83,10 +83,11 @@ type Resolved is Data:
   NotFound{what: String}
 
 # Environment signals for display: Bend has no TTY primitive, so color is
-# opt-in (--colors) with automatic vetoes (NO_COLOR, TERM=dumb, --no-colors,
-# --json). The rich logo shows unless the terminal is dumb, LANG=C or --json.
+# ON by default with automatic vetoes (NO_COLOR, TERM=dumb, --no-colors,
+# --json). --colors stays parsed for compatibility (no-op). The rich logo
+# shows unless the terminal is dumb, the locale is not UTF-8, or --json.
 type EnvFlags is Data:
-  Env{term_dumb: Bool, no_color_env: Bool, lang_c: Bool}
+  Env{term_dumb: Bool, no_color_env: Bool, no_utf8: Bool}
 
 def decide_color_off_env(no_color_env: Bool) -> Bool:
   match no_color_env:
@@ -124,18 +125,14 @@ def decide_color_veto(is_off: Bool) -> Bool:
       True{}
 
 def decide_color_on(colors_flag: Bool, is_off: Bool) -> Bool:
-  match colors_flag:
-    case True{}:
-      decide_color_veto(is_off)
-    case False{}:
-      False{}
+  decide_color_veto(is_off)
 
 def resolve_color(colors_flag: Bool, no_colors: Bool, json_out: Bool, term_dumb: Bool, no_color_env: Bool) -> Bool:
   decide_color_on(colors_flag, decide_color_off(no_colors, json_out, term_dumb, no_color_env))
 
 def color_of(+opts: Args.GlobalOpts, +env: EnvFlags) -> Bool:
   match env:
-    case Env{term_dumb, no_color_env, lang_c}:
+    case Env{term_dumb, no_color_env, no_utf8}:
       resolve_color(Args.colors_flag_of(opts), Args.no_colors_flag_of(opts), Args.json_flag_of(opts), term_dumb, no_color_env)
 
 def rich_json(json_out: Bool) -> Bool:
@@ -145,24 +142,24 @@ def rich_json(json_out: Bool) -> Bool:
     case False{}:
       True{}
 
-def rich_lang(lang_c: Bool, json_out: Bool) -> Bool:
-  match lang_c:
+def rich_lang(no_utf8: Bool, json_out: Bool) -> Bool:
+  match no_utf8:
     case True{}:
       False{}
     case False{}:
       rich_json(json_out)
 
-def rich_go(term_dumb: Bool, lang_c: Bool, json_out: Bool) -> Bool:
+def rich_go(term_dumb: Bool, no_utf8: Bool, json_out: Bool) -> Bool:
   match term_dumb:
     case True{}:
       False{}
     case False{}:
-      rich_lang(lang_c, json_out)
+      rich_lang(no_utf8, json_out)
 
 def rich_of(+opts: Args.GlobalOpts, +env: EnvFlags) -> Bool:
   match env:
-    case Env{term_dumb, no_color_env, lang_c}:
-      rich_go(term_dumb, lang_c, Args.json_flag_of(opts))
+    case Env{term_dumb, no_color_env, no_utf8}:
+      rich_go(term_dumb, no_utf8, Args.json_flag_of(opts))
 
 def resolve_nonfile_go(+resolved: Maybe<&2, Value.Value>) -> Resolved:
   match resolved:
@@ -831,22 +828,54 @@ def term_is_dumb(res: Result<&1, &1, U32 & String, String>) -> Bool:
     case Done{val}:
       String.eq(val, "dumb")
 
-def lang_is_c(res: Result<&1, &1, U32 & String, String>) -> Bool:
+# UTF-8 detection: the box-drawing logo needs a UTF-8 locale. POSIX
+# precedence LC_ALL -> LC_CTYPE -> LANG, first set-and-non-empty wins;
+# everything unset assumes a modern terminal (rich). Covers UTF-8/utf8/UTF8.
+def utf8_text(+s: String) -> Bool:
+  Bool.or(String.contains(s, "UTF"), String.contains(s, "utf"))
+
+def decide_locale_nonempty(is_empty: Bool, +val: String) -> Maybe<&2, String>:
+  match is_empty:
+    case True{}:
+      None{}
+    case False{}:
+      Some{val}
+
+def locale_res_to_maybe(res: Result<&1, &1, U32 & String, String>) -> Maybe<&2, String>:
   match res:
     case Fail{error}:
-      False{}
-    case Done{val}:
-      String.starts_with(val, "C")
+      None{}
+    case Done{+val}:
+      decide_locale_nonempty(String.is_empty(val), val)
 
-def env_of(term_res: Result<&1, &1, U32 & String, String>, nocolor_res: Result<&1, &1, U32 & String, String>, lang_res: Result<&1, &1, U32 & String, String>) -> EnvFlags:
-  Env{term_is_dumb(term_res), no_color_set(nocolor_res), lang_is_c(lang_res)}
+def locale_pick_go(+picked: Maybe<&2, String>, +fallback: Maybe<&2, String>) -> Maybe<&2, String>:
+  match picked:
+    case Some{val}:
+      Some{val}
+    case None{}:
+      fallback
+
+def locale_pick(+lc_all: Maybe<&2, String>, +lc_ctype: Maybe<&2, String>, +lang: Maybe<&2, String>) -> Maybe<&2, String>:
+  locale_pick_go(lc_all, locale_pick_go(lc_ctype, lang))
+
+def locale_no_utf8(+picked: Maybe<&2, String>) -> Bool:
+  match picked:
+    case None{}:
+      False{}
+    case Some{val}:
+      Bool.not(utf8_text(val))
+
+def env_of(term_res: Result<&1, &1, U32 & String, String>, nocolor_res: Result<&1, &1, U32 & String, String>, lc_all_res: Result<&1, &1, U32 & String, String>, lc_ctype_res: Result<&1, &1, U32 & String, String>, lang_res: Result<&1, &1, U32 & String, String>) -> EnvFlags:
+  Env{term_is_dumb(term_res), no_color_set(nocolor_res), locale_no_utf8(locale_pick(locale_res_to_maybe(lc_all_res), locale_res_to_maybe(lc_ctype_res), locale_res_to_maybe(lang_res)))}
 
 def read_env_flags() -> IO(EnvFlags):
   do IO<EnvFlags>:
     term_res : Result<&1, &1, U32 & String, String> <- IO.get_env("TERM")
     nocolor_res : Result<&1, &1, U32 & String, String> <- IO.get_env("NO_COLOR")
+    lc_all_res : Result<&1, &1, U32 & String, String> <- IO.get_env("LC_ALL")
+    lc_ctype_res : Result<&1, &1, U32 & String, String> <- IO.get_env("LC_CTYPE")
     lang_res : Result<&1, &1, U32 & String, String> <- IO.get_env("LANG")
-    return env_of(term_res, nocolor_res, lang_res)
+    return env_of(term_res, nocolor_res, lc_all_res, lc_ctype_res, lang_res)
 
 def finish_argv(+opts: Args.GlobalOpts, +outcome: Render.Outcome, +env: EnvFlags) -> IO(Unit):
   finish_argv_go(Render.render_outcome(outcome, Args.json_flag_of(opts), Render.opts_of(color_of(opts, env), Args.verbose_flag_of(opts))), outcome, Render.succeeded(outcome))

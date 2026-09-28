@@ -149,6 +149,15 @@ def Laws.parse_no_colors_flag():
 def Laws.usage_set_nonempty():
   {==}
 
+def Laws.usage_overview_has_usage():
+  {==}
+
+def Laws.usage_overview_has_examples():
+  {==}
+
+def Laws.usage_overview_has_exit_codes():
+  {==}
+
 def Laws.parse_help_topic_routes():
   {==}
 
@@ -168,6 +177,21 @@ def Laws.strip_argv0_drops_head():
   {==}
 
 def Laws.strip_argv0_empty():
+  {==}
+
+def Laws.utf8_text_c_utf8():
+  {==}
+
+def Laws.utf8_text_plain_c():
+  {==}
+
+def Laws.locale_pick_lc_all_wins():
+  {==}
+
+def Laws.locale_pick_lang_c_is_plain():
+  {==}
+
+def Laws.locale_pick_unset_is_rich():
   {==}
 
 def Laws.welcome_plain_has_next_step():
@@ -191,7 +215,10 @@ def Laws.status_counts_keys():
 def Laws.resolve_color_flag_on():
   {==}
 
-def Laws.resolve_color_flag_off():
+def Laws.resolve_color_default_on():
+  {==}
+
+def Laws.resolve_color_veto_no_colors_flag():
   {==}
 
 def Laws.resolve_color_veto_no_color():

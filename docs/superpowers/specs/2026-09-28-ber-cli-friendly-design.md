@@ -105,16 +105,20 @@ store ready at ./.ber (session: ana)
 → then: ber get demo/hello
 ```
 
-Fallback plano (pipe / `TERM=dumb` / `LANG=C` / `--no-colors` / `--json`):
+Fallback plano (`TERM=dumb` / locale sin UTF-8 / `--json`):
 
 ```
-ber
+ber-cli 0.2.1.0
 Welcome to Ber — save, version, merge.
 store ready at ./.ber (session: ana)
 → try: ber set demo/hello --text "world"
 → then: ber get demo/hello
 ```
 
+- Detección UTF-8 (as-built, corrige `LANG=C` literal): precedencia POSIX
+  `LC_ALL` → `LC_CTYPE` → `LANG`, gana el primero no vacío; si contiene
+  `UTF`/`utf` (cubre `C.UTF-8`, `en_US.UTF-8`) el logo se muestra. Todo
+  vacío/unset → asume terminal moderna (rich). `LANG=C` pelado → fallback.
 - El logo es fijo, sin dependencias. Con `color_on=False` sale sin ANSI (ley);
   el fallback además omite el dibujo (regla Unicode).
 - Incluye next-steps copiables. No crea session ni commits, solo el store.
@@ -143,22 +147,22 @@ tree:<hash> (3 entries)
 - `get`: pretty JSON cuando el valor es `Object` (humano), `--json` sin cambio.
 - `Ok{text}` nunca lleva ANSI (ley existente).
 
-## 7. Auto-color por TTY (decisión cerrada + ajuste as-built)
+## 7. Auto-color (decisión cerrada + ajustes as-built)
 
 ```
-color_on = --colors AND NOT (--no-colors OR --json OR TERM==dumb OR NO_COLOR set)
+color_on = NOT (--no-colors OR --json OR TERM==dumb OR NO_COLOR set)
 ```
 
 - Spikes probaron que Bend no expone primitiva TTY (`Process.run` captura
   stdout del hijo → `test -t 1` siempre falso) y que `match` no entra en
-  `do`-blocks ni hay recursión mutua. Sin señal TTY fiable, el default-ON
-  fugaría ANSI a pipes: el diseño es **opt-in con auto-off**.
-- A mano en terminal: `--colors` colorea. En `NO_COLOR=1` / `TERM=dumb` /
-  `--no-colors` / `--json` → plano aunque se pase `--colors`.
-- `detect` vive en `Run` vía `IO.get_env("TERM"/"NO_COLOR"/"LANG")`.
+  `do`-blocks ni hay recursión mutua. Sin señal TTY fiable y por decisión
+  del usuario, el diseño final es **color on por defecto**: sin flags se
+  colorea; los vetos (`--no-colors`, `--json`, `TERM=dumb`, `NO_COLOR=1`)
+  siempre ganan. `--colors` se sigue parseando pero es no-op (compat).
+- `detect` vive en `Run` vía `IO.get_env("TERM"/"NO_COLOR"/"LANG"/…)`.
   `Render` no cambia de firma, recibe `color_on` resuelto.
 - El header vistoso no depende del color: el logo sale por defecto salvo
-  `TERM=dumb`, `LANG=C*` o `--json` (fallback `ber` + mismo texto).
+  `TERM=dumb`, locale sin UTF-8 o `--json` (fallback + mismo texto).
 - Colores: verde `merged:`, rojo `conflict:`, amarillo `unprovable:`, dim hints.
   `Ok` sin color.
 

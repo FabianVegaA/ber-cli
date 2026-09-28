@@ -198,6 +198,15 @@ law parse_no_colors_flag:
 law usage_set_nonempty:
   {String.eq(Args.usage_text("set"), "") == False{} : Bool}
 
+law usage_overview_has_usage:
+  {String.contains(Args.usage_text(""), "Usage: ber") == True{} : Bool}
+
+law usage_overview_has_examples:
+  {String.contains(Args.usage_text(""), "Examples:") == True{} : Bool}
+
+law usage_overview_has_exit_codes:
+  {String.contains(Args.usage_text(""), "Exit codes:") == True{} : Bool}
+
 law parse_help_topic_routes:
   {Args.parse_command(Con{"help", Con{"set", Nil{}}}) == Args.Help{"set"} : Args.Command}
 
@@ -211,13 +220,29 @@ law parse_version_short:
   {Args.parse_command(Con{"-V", Nil{}}) == Args.Version{} : Args.Command}
 
 law version_text_pinned:
-  {Render.version_text() == "ber-cli 0.2.1.0" : String}
+  {Render.version_text() == "ber-cli 0.2.2.0" : String}
 
 law strip_argv0_drops_head:
   {Run.strip_argv0(Con{"prog", Con{"init", Nil{}}}) == Con{"init", Nil{}} : List<String>}
 
 law strip_argv0_empty:
   {Run.strip_argv0(Nil{}) == Nil{} : List<String>}
+
+# Locale detection: UTF-8 capable locales allow the rich init logo.
+law utf8_text_c_utf8:
+  {Run.utf8_text("C.UTF-8") == True{} : Bool}
+
+law utf8_text_plain_c:
+  {Run.utf8_text("C") == False{} : Bool}
+
+law locale_pick_lc_all_wins:
+  {Run.locale_no_utf8(Run.locale_pick(Some{"C.UTF-8"}, None{}, Some{"C"})) == False{} : Bool}
+
+law locale_pick_lang_c_is_plain:
+  {Run.locale_no_utf8(Run.locale_pick(None{}, None{}, Some{"C"})) == True{} : Bool}
+
+law locale_pick_unset_is_rich:
+  {Run.locale_no_utf8(Run.locale_pick(None{}, None{}, None{})) == False{} : Bool}
 
 # Friendly render: welcome header, table diff, tree view.
 law welcome_plain_has_next_step:
@@ -238,12 +263,15 @@ law tree_renders_entries:
 law status_counts_keys:
   {Render.render_status("ana", Con{LogicalKey.Make{"a", "r1"}, Nil{}}) == "staged (session ana): 1 keys\n├─ a/r1" : String}
 
-# Color auto-off: --colors opts in, vetoes win, default stays plain.
+# Color default-on: vetoes always win (--no-colors, --json, TERM=dumb, NO_COLOR).
 law resolve_color_flag_on:
   {Run.resolve_color(True{}, False{}, False{}, False{}, False{}) == True{} : Bool}
 
-law resolve_color_flag_off:
-  {Run.resolve_color(False{}, False{}, False{}, False{}, False{}) == False{} : Bool}
+law resolve_color_default_on:
+  {Run.resolve_color(False{}, False{}, False{}, False{}, False{}) == True{} : Bool}
+
+law resolve_color_veto_no_colors_flag:
+  {Run.resolve_color(False{}, True{}, False{}, False{}, False{}) == False{} : Bool}
 
 law resolve_color_veto_no_color:
   {Run.resolve_color(True{}, False{}, False{}, False{}, True{}) == False{} : Bool}

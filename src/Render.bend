@@ -174,7 +174,7 @@ def render_modified_detail(+entries: List<&2, Comparison.ModifiedEntry>) -> Stri
 
 # Pinned to pack.json name@version; bump together.
 def version_text() -> String:
-  "ber-cli 0.2.1.0"
+  "ber-cli 0.2.2.0"
 
 # Friendly header: box-drawing logo on TTY, plain fallback otherwise.
 # English only; Ok{text} never carries ANSI (existing laws untouched).
@@ -185,14 +185,14 @@ def welcome_body() -> String:
   "Welcome to Ber — save, version, merge.\n→ try: ber set demo/hello --text \"world\"\n→ then: ber get demo/hello"
 
 def welcome_fallback() -> String:
-  "ber\n" ++ welcome_body()
+  version_text() ++ "\n" ++ welcome_body()
 
 def welcome_header_colored(color_on: Bool) -> String:
   match color_on:
     case True{}:
-      color_wrap(True{}, "36", ber_logo()) ++ "\n" ++ welcome_body()
+      color_wrap(True{}, "36", ber_logo()) ++ "\n" ++ version_text() ++ "\n" ++ welcome_body()
     case False{}:
-      ber_logo() ++ "\n" ++ welcome_body()
+      ber_logo() ++ "\n" ++ version_text() ++ "\n" ++ welcome_body()
 
 def welcome_header(+opts: HumanOpts) -> String:
   match opts:
