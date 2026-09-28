@@ -29,27 +29,13 @@ commits content-addressed; `bend-kit-json` parses documents.
 ## Install / Build
 
 Prerequisites: [Bend](https://bend-lang.com) >= 2.0.32 (`bend version`).
-2.0.32 changed `IO.args()` to include `argv[0]`; the CLI strips it, so older
-toolchains build binaries that misparse every command.
 
 ```bash
-git clone <repo> ber-cli && cd ber-cli
+git clone git@github.com:FabianVegaA/ber-cli.git && cd ber-cli
 bend cli.bend -o ber        # build the binary (./ber)
 export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
 ber --version               # check the install: ber-cli 0.2.2.0
-for f in src/Args.bend src/Key.bend; do bend $f --check-only; done   # gate: ALL PROOFS CHECK
 ```
-
-Pure modules certify under `bend ... --check-only`. The full
-`bend PROOF.bend` verdict additionally demands kernel certification of
-foreign code: since 2.0.32 it fails closed on `ber-core`'s `Fs`/JSON foreign
-imports (pre-existing — fails identically on a clean checkout), so the
-effects shell (`Run`) is covered by binary smoke instead (see
-`docs/superpowers/plans/2026-09-28-ber-cli-friendly.md`, Task 6).
-
-No `npm install`, no dependencies to fetch: `ber-core-store` and pins resolve
-through Bend packages. Put `./ber` on your `PATH` or call it by path; per-command
-help lives in the binary itself (`ber --help`, `ber help set`).
 
 ## Quickstart
 
@@ -62,18 +48,6 @@ ber get shop-config/limits --session demo   # reads HEAD (no --at needed)
 ber log --short
 ber status --session demo
 ```
-
-No `export S`, no `--store`: the store defaults to `./.ber` (`ber init`
-creates it). `--session` is still required: it names your uncommitted working
-set.
-
-Shortcuts: `set` = `write`, `get` = `record get`. The key goes in a single
-`ns/record` arg (`:` is not a separator). `get` without `--at` reads the last
-commit recorded in `./.ber/LOG` (best-effort journal: pass `--at` explicitly
-in scripts). Colors are on by default, turned off by `NO_COLOR=1`,
-`TERM=dumb`, `--no-colors` or `--json` (pipes stay clean only when one of
-those applies). `--colors` is accepted for compatibility but is a no-op. The `init` logo shows unless `TERM=dumb`, the locale is not UTF-8
-(POSIX precedence: `LC_ALL` → `LC_CTYPE` → `LANG`, checked for `UTF-8`), or `--json`.
 
 Advanced reference with `--ns/--record` flags (still supported):
 
@@ -151,18 +125,3 @@ Only `union-disjoint` is accepted as strategy; anything else answers `unprovable
 | `30` | absent / not found |
 | `3` | IO error |
 | `2` | usage error |
-
-## Architecture
-
-```
-cli.bend            # main: IO.args -> Args.parse_both -> Run.dispatch -> Render -> print/exit/die
-src/Args.bend       # PURE: argv -> Command + GlobalOpts (single structural pass, no string compares)
-src/Input.bend      # PURE: value flags -> Value (files resolve in Run, never here)
-src/Render.bend     # PURE: Outcome -> human / JSON / hint / exit code
-src/Run.bend        # EFFECTS ONLY: mkdir -p, open_durable, run_op_durable per arm
-LAWS.bend / PROOF.bend / bolt.bend
-```
-
-No tests by explicit decision: pure modules carry machine-checked laws (`bend PROOF.bend`, 33 laws), the effects shell is verified by cross-process binary smoke. Gate before every commit: `bend PROOF.bend` green + `bolt` 0 errors.
-
-See `docs/superpowers/specs/2026-09-27-ber-cli-design.md` for the full design.
