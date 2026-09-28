@@ -100,3 +100,96 @@ def Laws.parse_commit_create_parent():
 
 def Laws.parse_help_flag_alias():
   {==}
+
+def Laws.split_key_slash():
+  {==}
+
+def Laws.split_key_colon_is_none():
+  {==}
+
+def Laws.split_key_inner_colon_is_none():
+  {==}
+
+def Laws.split_key_no_sep_is_none():
+  {==}
+
+def Laws.split_key_empty_seg_is_none():
+  {==}
+
+def Laws.split_key_multi_slash_is_none():
+  {==}
+
+def Laws.parse_set_key_slash():
+  {==}
+
+def Laws.parse_set_colon_is_usage():
+  {==}
+
+def Laws.parse_set_flags_fallback():
+  {==}
+
+def Laws.parse_get_key_slash():
+  {==}
+
+def Laws.parse_get_flags_fallback():
+  {==}
+
+def Laws.parse_init():
+  {==}
+
+def Laws.parse_log():
+  {==}
+
+def Laws.parse_status():
+  {==}
+
+def Laws.parse_no_colors_flag():
+  {==}
+
+def Laws.usage_set_nonempty():
+  {==}
+
+def Laws.parse_help_topic_routes():
+  {==}
+
+def Laws.parse_version_word():
+  {==}
+
+def Laws.parse_version_flag():
+  {==}
+
+def Laws.parse_version_short():
+  {==}
+
+def Laws.version_text_pinned():
+  {==}
+
+def Laws.welcome_plain_has_next_step():
+  {==}
+
+def Laws.welcome_fallback_has_no_logo():
+  {==}
+
+def Laws.welcome_fallback_mentions_try():
+  {==}
+
+def Laws.table_diff_header():
+  {==}
+
+def Laws.tree_renders_entries():
+  {==}
+
+def Laws.status_counts_keys():
+  {==}
+
+def Laws.resolve_color_flag_on():
+  {==}
+
+def Laws.resolve_color_flag_off():
+  {==}
+
+def Laws.resolve_color_veto_no_color():
+  {==}
+
+def Laws.resolve_color_veto_json():
+  {==}

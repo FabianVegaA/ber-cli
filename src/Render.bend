@@ -171,3 +171,74 @@ def render_modified_go(+entries: List<&2, Comparison.ModifiedEntry>, +acc: Strin
 
 def render_modified_detail(+entries: List<&2, Comparison.ModifiedEntry>) -> String:
   render_modified_go(entries, "")
+
+# Pinned to pack.json name@version; bump together.
+def version_text() -> String:
+  "ber-cli 0.1.0.0"
+
+# Friendly header: box-drawing logo on TTY, plain fallback otherwise.
+# English only; Ok{text} never carries ANSI (existing laws untouched).
+def ber_logo() -> String:
+  "██████╗ ███████╗██████╗\n██╔══██╗██╔════╝██╔══██╗\n██████╔╝█████╗  ██████╔╝\n██╔══██╗██╔══╝  ██╔══██╗\n██████╔╝███████╗██║  ██║\n╚═════╝ ╚══════╝╚═╝  ╚═╝"
+
+def welcome_body() -> String:
+  "Welcome to Ber — save, version, merge.\n→ try: ber set demo/hello --text \"world\"\n→ then: ber get demo/hello"
+
+def welcome_fallback() -> String:
+  "ber\n" ++ welcome_body()
+
+def welcome_header_colored(color_on: Bool) -> String:
+  match color_on:
+    case True{}:
+      color_wrap(True{}, "36", ber_logo()) ++ "\n" ++ welcome_body()
+    case False{}:
+      ber_logo() ++ "\n" ++ welcome_body()
+
+def welcome_header(+opts: HumanOpts) -> String:
+  match opts:
+    case Human{color_on, verbose}:
+      welcome_header_colored(color_on)
+
+# Aligned table diff: header counts plus one line per key.
+def render_added_lines_go(+keys: List<&2, LogicalKey.LogicalKey>, +acc: String) -> String:
+  match keys:
+    case Nil{}:
+      acc
+    case Con{head_key, rest_keys}:
+      render_added_lines_go(rest_keys, acc ++ "\n  + " ++ LogicalKey.encode_logical_key(head_key))
+
+def render_added_lines(keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  render_added_lines_go(keys, "")
+
+def render_removed_lines_go(+keys: List<&2, LogicalKey.LogicalKey>, +acc: String) -> String:
+  match keys:
+    case Nil{}:
+      acc
+    case Con{head_key, rest_keys}:
+      render_removed_lines_go(rest_keys, acc ++ "\n  - " ++ LogicalKey.encode_logical_key(head_key))
+
+def render_removed_lines(keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  render_removed_lines_go(keys, "")
+
+def render_table_diff(+from_id: String, +to_id: String, +added: List<&2, LogicalKey.LogicalKey>, +removed: List<&2, LogicalKey.LogicalKey>, +mods: List<&2, Comparison.ModifiedEntry>) -> String:
+  "≡ diff " ++ from_id ++ ".." ++ to_id ++ "  (+" ++ Nat.show(List.length(&2, LogicalKey.LogicalKey, added)) ++ " ~" ++ Nat.show(List.length(&2, Comparison.ModifiedEntry, mods)) ++ " -" ++ Nat.show(List.length(&2, LogicalKey.LogicalKey, removed)) ++ ")" ++ render_added_lines(added) ++ render_removed_lines(removed) ++ render_modified_detail(mods)
+
+# Tree view for show-tree / status.
+def render_tree_lines_go(+keys: List<&2, LogicalKey.LogicalKey>, +acc: String) -> String:
+  match keys:
+    case Nil{}:
+      acc
+    case Con{head_key, rest_keys}:
+      render_tree_lines_go(rest_keys, acc ++ "\n├─ " ++ LogicalKey.encode_logical_key(head_key))
+
+def render_tree_lines(keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  render_tree_lines_go(keys, "")
+
+def render_tree(+tree_hash: String, +keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  "tree:" ++ tree_hash ++ " (" ++ Nat.show(List.length(&2, LogicalKey.LogicalKey, keys)) ++ " entries)" ++ render_tree_lines(keys)
+
+def render_log_line(+short_id: String, +summary: String) -> String:
+  short_id ++ " - " ++ summary
+
+def render_status(+session_id: String, +keys: List<&2, LogicalKey.LogicalKey>) -> String:
+  "staged (session " ++ session_id ++ "): " ++ Nat.show(List.length(&2, LogicalKey.LogicalKey, keys)) ++ " keys" ++ render_tree_lines(keys)

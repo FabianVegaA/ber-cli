@@ -1,45 +1,88 @@
-# ber-cli
+# Ber CLI
 
 `ber-cli` exposes the public API of `ber-core` (`ber.bend`, levels 1 and 2) as a command-line interface written in pure Bend. It is not git-like and does not compete as a VCS: a thin 1:1 shell over the ber-core domains (`record`, `commit`, `diff`/`compare`, `merge`, `certificate`), with pretty output (human + `--json`) and errors that point at the next step.
 
 Built on `ber-core-store@0.1.2.0` (pins inherited: mylsm, bend-kit-json, bend-codec-lib, vendored SHA).
 
-## Quickstart
+## What is Ber?
+
+**Ber** is a content-addressed store for versioned records. Data lives in
+namespaces (`shop-config`), split into records (`limits`); each `commit` is a
+snapshot identified by its hash, and values are typed (`text`, structured
+`json`, binary `blob`). The CLI stages values in a session, commits snapshots,
+diffs any two commits, and merges divergent histories.
+
+**How it differs from git:** git versions file trees with branch DAGs and
+leaves conflict resolution to humans. Ber versions individual records with
+linear-parent history, and its three-way `union-disjoint` merges carry
+**verification certificates** that can be re-checked offline
+(`certificate verify`) — a merge is either `merged`, `conflict` or
+`unprovable`, each with a machine-checked meaning (`bend PROOF.bend`,
+60 laws). Ber is built for app state and config, not for source code.
+
+**How it builds on mylsm:** `ber-core`'s `Store.Handle` wraps a
+`mylsm-lsm-store` LSM database (`mylsm-lsm-store@0.3.2.0`): every command
+replays `<store>/wal.log` on open and flushes its journal with fsync, so
+separate processes share durable state. Content hashes (vendored SHA) make
+commits content-addressed; `bend-kit-json` parses documents.
+
+## Install / Build
+
+Prerequisites: [Bend](https://bend-lang.com) 2.0.x (`bend version`).
 
 ```bash
-bend cli.bend -o ber
-export S=./.ber-shop
+git clone <repo> ber-cli && cd ber-cli
+bend cli.bend -o ber        # build the binary (./ber)
+export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
+ber --version               # check the install: ber-cli 0.1.0.0
+bend PROOF.bend             # gate: must print "All terms check."
+```
 
-BASE=$(./ber write --store $S --session ana --ns shop-config --record limits --json '{"max_items": 50}' --parents | sed 's/committed://')
+No `npm install`, no dependencies to fetch: `ber-core-store` and pins resolve
+through Bend packages. Put `./ber` on your `PATH` or call it by path; per-command
+help lives in the binary itself (`ber --help`, `ber help set`).
 
-A=$(./ber write --store $S --session ana --ns shop-config --record limits --json '{"max_items": 100}' --parent $BASE | sed 's/committed://')
-C=$(./ber write --store $S --session bea --ns shop-config --record banner --text "sale" --parent $BASE | sed 's/committed://')
+## Quickstart
 
-./ber record get --store $S --ns shop-config --record limits --at $A   # read={"max_items":100}
-./ber diff --store $S --from $A --to $C --verbose
-./ber merge --store $S --first $A --second $C                 # merged:<id>, exit 0
+### Friendly (recommended)
+
+```bash
+ber init
+ber set shop-config/limits --text "hello" --session demo
+ber get shop-config/limits --session demo   # reads HEAD (no --at needed)
+ber log --short
+ber status --session demo
+```
+
+No `export S`, no `--store`: the store defaults to `./.ber` (`ber init`
+creates it). `--session` is still required: it names your uncommitted working
+set.
+
+Shortcuts: `set` = `write`, `get` = `record get`. The key goes in a single
+`ns/record` arg (`:` is not a separator). `get` without `--at` reads the last
+commit recorded in `./.ber/LOG` (best-effort journal: pass `--at` explicitly
+in scripts). Color is opt-in via `--colors`, auto-disabled by `NO_COLOR=1`,
+`TERM=dumb`, `--no-colors` or `--json` (pipes stay clean). `--colors` forces
+it. The `init` logo shows unless `TERM=dumb`, `LANG=C` or `--json`.
+
+Advanced reference with `--ns/--record` flags (still supported):
+
+```bash
+ber write --session demo --ns shop-config --record limits --text "50"
+ber write --session demo --ns shop-config --record limits --text "100" --parent <base>
+ber write --session dev --ns shop-config --record banner --text "sale" --parent <base>
+ber log --short   # copy the ids to use below
+
+ber record get --ns shop-config --record limits --at <a>   # read=100
+ber diff --from <a> --to <c> --verbose
+ber merge --first <a> --second <c>                          # merged:<id>, exit 0
 ```
 
 State is durable: every command replays `<store>/wal.log` on open and flushes its journal with fsync, so separate processes share state.
 
-```mermaid
-flowchart LR
-    subgraph session["session (staging)"]
-        PUT["record put / rm"]
-    end
-    COMMIT["commit create"] --> SNAP["commit <hash>\n+ parents"]
-    PUT --> COMMIT
-    SNAP --> GET["record get --at"]
-    A2["commit A"] --> MERGE["merge"]
-    B2["commit B"] --> MERGE
-    MERGE --> OK["merged:<id>"]
-    MERGE --> CF["conflict → diff --verbose"]
-    MERGE --> UP["unprovable → show-tree"]
-```
-
 ## Concepts
 
-- **session**: id of the uncommitted working set (`stage/{session}/…` in ber-core). `record put`/`rm` write into the session; `commit create` materializes it into a commit. Nothing is visible to `record get` until committed. That is why the quickstart passes `--session ana` to both `write` steps.
+- **session**: id of the uncommitted working set (`stage/{session}/…` in ber-core). `record put`/`rm` write into the session; `commit create` materializes it into a commit. Nothing is visible to `record get` until committed. That is why the quickstart passes `--session demo` to the `set` step.
 - **ns (namespace)**: first segment of the logical key; groups records by area (e.g. `shop-config`, `shop-prices`). The full logical key is `ns/record`.
 - **record**: id of the record inside the namespace; the versioned unit (each commit stores one value or tombstone per key, e.g. `shop-config/limits`).
 - **commit**: content-addressed snapshot (id = hash). `record get --at COMMIT` reads the value in force at that commit; `--parent` links linear history so `merge` can find a common ancestor.
@@ -53,14 +96,14 @@ flowchart LR
 - Blobs never dump bytes to the output: `read=<blob N bytes>`; bad `--kind` → usage-error (2), unreadable file → io-error (3).
 
 ```bash
-./ber record put --store $S --session ana --ns product-media --record sku-42-front --file ./front.jpg --kind blob
-./ber commit create --store $S --session ana
-./ber record get --store $S --ns product-media --record sku-42-front --at <COMMIT>   # read=<blob 18432 bytes>
+ber record put --session demo --ns product-media --record sku-42-front --file ./front.jpg --kind blob
+ber commit create --session demo
+ber record get --ns product-media --record sku-42-front --at <COMMIT>   # read=<blob 18432 bytes>
 ```
 
 ## Commands
 
-Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--colors` (opt-in ANSI), `--verbose`, `--help` (`--help`/`-h` alias). `--parent` is singular (linear history); `--meta` deferred to v2.
+Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--colors` (opt-in ANSI; auto-off with `NO_COLOR=1`, `TERM=dumb`, `--json`), `--no-colors` (force plain), `--verbose`, `--help` (`--help`/`-h` alias). `--parent` is singular (linear history); `--meta` deferred to v2.
 
 | Subcommand | Delegates to | Description |
 |---|---|---|
@@ -75,6 +118,12 @@ Global flags: `--store DIR` (default `./.ber`), `--session ID`, `--json`, `--col
 | `write --session S --ns N --record R ... [--parent P]` | `Ber.commit_value` | Shortcut: stage and commit in one step, prints the new commit id |
 | `compare --from A --to B` | `Ber.compare_summary` | Shortcut: diff rendered as a single counts line |
 | `merge-verify --first A --second B` | `Ber.merge_and_verify` | Shortcut: merge plus verify rendered as a verdict |
+| `init [--store DIR]` | `Store.open_durable` | Creates the store dir, prints the welcome header |
+| `set KEY ... [--parent P]` (`KEY=ns/record`) | `Ber.commit_value` | Friendly alias for `write` with single-arg key |
+| `get KEY [--at COMMIT]` | `Ber.read_value_at` | Friendly alias for `record get`; no `--at` reads `<store>/LOG` head |
+| `log [--limit N]` | `<store>/LOG` journal | Lists recent commit ids (short); `--limit` defaults to 20 |
+| `status [--session S]` | `Staging.load_stage_index` | Shows staged keys not yet committed |
+| `help [topic]` | `Args.usage_text` | Per-command help with examples (`set`, `get`, `merge`, …) |
 
 Only `union-disjoint` is accepted as strategy; anything else answers `unprovable:unknown-strategy`.
 

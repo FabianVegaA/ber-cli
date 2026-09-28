@@ -1,5 +1,7 @@
 import Base
 import ./src/Args.bend as Args
+import ./src/Key.bend as NsKey
+import ./src/Run.bend as Run
 import ./src/Input.bend as Input
 import ber-core-store@0.1.2.0/src/Value.bend as Value
 import ./src/Render.bend as Render
@@ -120,11 +122,11 @@ law succeeded_conflict_false:
 
 # per-command session beats the global one.
 law session_cmd_wins:
-  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}}, "s1") == "s1" : String}
+  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}, False{}}, "s1") == "s1" : String}
 
 # empty command session falls back to global.
 law session_opts_fallback:
-  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}}, "") == "s2" : String}
+  {Args.session_or(Args.Opts{"./.ber", "s2", False{}, False{}, False{}, False{}}, "") == "s2" : String}
 
 # two keys join with one space.
 law render_key_list_two:
@@ -145,3 +147,100 @@ law parse_commit_create_parent:
 # --help flag is an alias for help.
 law parse_help_flag_alias:
   {Args.parse_command(Con{"--help", Nil{}}) == Args.Help{""} : Args.Command}
+
+# Key family: split on first "/" only; ":" never separates.
+law split_key_slash:
+  {NsKey.split_key("shop/limits") == Some{("shop", "limits")} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+law split_key_colon_is_none:
+  {NsKey.split_key("shop:limits") == None{} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+law split_key_inner_colon_is_none:
+  {NsKey.split_key("shop/li:mits") == None{} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+law split_key_no_sep_is_none:
+  {NsKey.split_key("shop") == None{} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+law split_key_empty_seg_is_none:
+  {NsKey.split_key("/limits") == None{} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+law split_key_multi_slash_is_none:
+  {NsKey.split_key("a/b/c") == None{} : Maybe<&2, Sigma<&2, &2, String, _ => String>>}
+
+# Friendly shortcuts: KEY form, flags fallback, init, no-colors, help topics.
+law parse_set_key_slash:
+  {Args.parse_command(Con{"set", Con{"shop/limits", Con{"--text", Con{"v1", Con{"--session", Con{"ana", Nil{}}}}}}}) == Args.Set{"ana", "shop", "limits", Args.FromText{"v1"}, Nil{}} : Args.Command}
+
+law parse_set_colon_is_usage:
+  {Args.parse_command(Con{"set", Con{"shop:limits", Con{"--text", Con{"v1", Nil{}}}}}) == Args.UsageError{"set-needs-key-ns/record"} : Args.Command}
+
+law parse_set_flags_fallback:
+  {Args.parse_command(Con{"set", Con{"--ns", Con{"shop", Con{"--record", Con{"limits", Con{"--text", Con{"v1", Nil{}}}}}}}}) == Args.Set{"", "shop", "limits", Args.FromText{"v1"}, Nil{}} : Args.Command}
+
+law parse_get_key_slash:
+  {Args.parse_command(Con{"get", Con{"shop/limits", Nil{}}}) == Args.Get{"shop", "limits", ""} : Args.Command}
+
+law parse_get_flags_fallback:
+  {Args.parse_command(Con{"get", Con{"--ns", Con{"shop", Con{"--record", Con{"limits", Con{"--at", Con{"c1", Nil{}}}}}}}}) == Args.Get{"shop", "limits", "c1"} : Args.Command}
+
+law parse_init:
+  {Args.parse_command(Con{"init", Nil{}}) == Args.Init{} : Args.Command}
+
+law parse_log:
+  {Args.parse_command(Con{"log", Nil{}}) == Args.Log{""} : Args.Command}
+
+law parse_status:
+  {Args.parse_command(Con{"status", Nil{}}) == Args.Status{""} : Args.Command}
+
+law parse_no_colors_flag:
+  {Args.no_colors_flag_of(Args.parse_opts(Con{"--no-colors", Nil{}})) == True{} : Bool}
+
+law usage_set_nonempty:
+  {String.eq(Args.usage_text("set"), "") == False{} : Bool}
+
+law parse_help_topic_routes:
+  {Args.parse_command(Con{"help", Con{"set", Nil{}}}) == Args.Help{"set"} : Args.Command}
+
+law parse_version_word:
+  {Args.parse_command(Con{"version", Nil{}}) == Args.Version{} : Args.Command}
+
+law parse_version_flag:
+  {Args.parse_command(Con{"--version", Nil{}}) == Args.Version{} : Args.Command}
+
+law parse_version_short:
+  {Args.parse_command(Con{"-V", Nil{}}) == Args.Version{} : Args.Command}
+
+law version_text_pinned:
+  {Render.version_text() == "ber-cli 0.1.0.0" : String}
+
+# Friendly render: welcome header, table diff, tree view.
+law welcome_plain_has_next_step:
+  {String.eq(Render.welcome_header(Render.plain_opts()), "") == False{} : Bool}
+
+law welcome_fallback_has_no_logo:
+  {String.eq(Render.welcome_fallback(), "") == False{} : Bool}
+
+law welcome_fallback_mentions_try:
+  {String.contains(Render.welcome_fallback(), "ber set") == True{} : Bool}
+
+law table_diff_header:
+  {Render.render_table_diff("a3f9c2d", "c71b00e", Con{LogicalKey.Make{"a", "b"}, Nil{}}, Nil{}, Nil{}) == "≡ diff a3f9c2d..c71b00e  (+1 ~0 -0)\n  + a/b" : String}
+
+law tree_renders_entries:
+  {Render.render_tree("h", Con{LogicalKey.Make{"a", "limits"}, Nil{}}) == "tree:h (1 entries)\n├─ a/limits" : String}
+
+law status_counts_keys:
+  {Render.render_status("ana", Con{LogicalKey.Make{"a", "r1"}, Nil{}}) == "staged (session ana): 1 keys\n├─ a/r1" : String}
+
+# Color auto-off: --colors opts in, vetoes win, default stays plain.
+law resolve_color_flag_on:
+  {Run.resolve_color(True{}, False{}, False{}, False{}, False{}) == True{} : Bool}
+
+law resolve_color_flag_off:
+  {Run.resolve_color(False{}, False{}, False{}, False{}, False{}) == False{} : Bool}
+
+law resolve_color_veto_no_color:
+  {Run.resolve_color(True{}, False{}, False{}, False{}, True{}) == False{} : Bool}
+
+law resolve_color_veto_json:
+  {Run.resolve_color(True{}, False{}, True{}, False{}, False{}) == False{} : Bool}

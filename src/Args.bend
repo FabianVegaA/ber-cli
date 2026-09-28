@@ -1,4 +1,5 @@
 import Base
+import ./Key.bend as NsKey
 
 # CLI syntax types. ValueSource is syntax-level: FromFile resolves in Run
 # (needs File IO), never in pure code.
@@ -33,44 +34,55 @@ type Command is Data:
   Write{session_id: String, namespace_name: String, record_id: String, source: ValueSource, parents: List<&2, String>}
   Compare{first_id: String, second_id: String}
   MergeVerify{first_id: String, second_id: String}
+  Set{session_id: String, namespace_name: String, record_id: String, source: ValueSource, parents: List<&2, String>}
+  Get{namespace_name: String, record_id: String, commit_id: String}
+  Log{limit_text: String}
+  Status{session_id: String}
+  Init{}
+  Version{}
   Help{topic: String}
   UsageError{message: String}
 
 # Global flags (spec §4 header).
 type GlobalOpts is Data:
-  Opts{store_dir: String, session_id: String, json_out: Bool, colors_on: Bool, verbose: Bool}
+  Opts{store_dir: String, session_id: String, json_out: Bool, colors_on: Bool, verbose: Bool, no_colors: Bool}
 
 # One-pass argv shape: head/sub positionals plus the token→successor map.
 type ArgvSplit is Data:
   Split{head_word: String, sub_word: String, flag_map: Map<&2, String>}
 
 def default_opts() -> GlobalOpts:
-  Opts{"./.ber", "", False{}, False{}, False{}}
+  Opts{"./.ber", "", False{}, False{}, False{}, False{}}
 
 def store_dir_of(opts: GlobalOpts) -> String:
   match opts:
-    case Opts{store_dir, session_id, json_out, colors_on, verbose}:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
       store_dir
 
 def session_of(opts: GlobalOpts) -> String:
   match opts:
-    case Opts{store_dir, session_id, json_out, colors_on, verbose}:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
       session_id
 
 def json_flag_of(opts: GlobalOpts) -> Bool:
   match opts:
-    case Opts{store_dir, session_id, json_out, colors_on, verbose}:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
       json_out
 
 def colors_flag_of(opts: GlobalOpts) -> Bool:
   match opts:
-    case Opts{store_dir, session_id, json_out, colors_on, verbose}:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
       colors_on
 
 def verbose_flag_of(opts: GlobalOpts) -> Bool:
   match opts:
-    case Opts{store_dir, session_id, json_out, colors_on, verbose}:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
       verbose
+
+def no_colors_flag_of(opts: GlobalOpts) -> Bool:
+  match opts:
+    case Opts{store_dir, session_id, json_out, colors_on, verbose, no_colors}:
+      no_colors
 
 # Prefers the per-command session; falls back to the global one.
 def session_or_go(cmd_missing: Bool, +opts: GlobalOpts, +cmd_session: String) -> String:
@@ -308,8 +320,15 @@ def parse_certificate_empty(is_empty: Bool, +sub_word: String, +flag_map: Map<&2
 def parse_certificate(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
   parse_certificate_empty(String.eq(sub_word, ""), sub_word, flag_map)
 
-def parse_is_help(+flag_map: Map<&2, String>) -> Command:
-  Help{flag_at(flag_map, "--for")}
+def help_topic_empty(is_empty: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_empty:
+    case True{}:
+      Help{flag_at(flag_map, "--for")}
+    case False{}:
+      Help{sub_word}
+
+def parse_is_help(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  help_topic_empty(String.eq(sub_word, ""), sub_word, flag_map)
 
 def parse_is_merge_verify(+flag_map: Map<&2, String>) -> Command:
   MergeVerify{flag_at(flag_map, "--first"), flag_at(flag_map, "--second")}
@@ -335,54 +354,54 @@ def parse_is_commit(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
 def parse_is_record(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
   parse_record_empty(String.eq(sub_word, ""), sub_word, flag_map)
 
-def parse_dispatch_help(is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_help(is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_help:
     case True{}:
-      parse_is_help(flag_map)
+      parse_is_help(sub_word, flag_map)
     case False{}:
       UsageError{"unknown-command"}
 
-def parse_dispatch_merge_verify(is_merge_verify: Bool, is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_merge_verify(is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_merge_verify:
     case True{}:
       parse_is_merge_verify(flag_map)
     case False{}:
-      parse_dispatch_help(is_help, flag_map)
+      parse_dispatch_help(is_help, sub_word, flag_map)
 
-def parse_dispatch_compare(is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_compare(is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_compare:
     case True{}:
       parse_is_compare(flag_map)
     case False{}:
-      parse_dispatch_merge_verify(is_merge_verify, is_help, flag_map)
+      parse_dispatch_merge_verify(is_merge_verify, is_help, sub_word, flag_map)
 
-def parse_dispatch_write(is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_write(is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_write:
     case True{}:
       parse_is_write(flag_map)
     case False{}:
-      parse_dispatch_compare(is_compare, is_merge_verify, is_help, flag_map)
+      parse_dispatch_compare(is_compare, is_merge_verify, is_help, sub_word, flag_map)
 
-def parse_dispatch_merge(is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_merge(is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_merge:
     case True{}:
       parse_is_merge(flag_map)
     case False{}:
-      parse_dispatch_write(is_write, is_compare, is_merge_verify, is_help, flag_map)
+      parse_dispatch_write(is_write, is_compare, is_merge_verify, is_help, sub_word, flag_map)
 
-def parse_dispatch_diff(is_diff: Bool, is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +flag_map: Map<&2, String>) -> Command:
+def parse_dispatch_diff(is_diff: Bool, is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_diff:
     case True{}:
       parse_is_diff(flag_map)
     case False{}:
-      parse_dispatch_merge(is_merge, is_write, is_compare, is_merge_verify, is_help, flag_map)
+      parse_dispatch_merge(is_merge, is_write, is_compare, is_merge_verify, is_help, sub_word, flag_map)
 
 def parse_dispatch_certificate(is_certificate: Bool, is_diff: Bool, is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_certificate:
     case True{}:
       parse_is_certificate(sub_word, flag_map)
     case False{}:
-      parse_dispatch_diff(is_diff, is_merge, is_write, is_compare, is_merge_verify, is_help, flag_map)
+      parse_dispatch_diff(is_diff, is_merge, is_write, is_compare, is_merge_verify, is_help, sub_word, flag_map)
 
 def parse_dispatch_commit(is_commit: Bool, is_certificate: Bool, is_diff: Bool, is_merge: Bool, is_write: Bool, is_compare: Bool, is_merge_verify: Bool, is_help: Bool, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_commit:
@@ -398,26 +417,158 @@ def parse_dispatch(is_record: Bool, is_commit: Bool, is_certificate: Bool, is_di
     case False{}:
       parse_dispatch_commit(is_commit, is_certificate, is_diff, is_merge, is_write, is_compare, is_merge_verify, is_help, sub_word, flag_map)
 
+# KEY (ns/record) or legacy --ns/--record flags. Missing/invalid key threads
+# True{} so the caller answers a friendly UsageError.
+def resolve_split(+split: Maybe<&2, Sigma<&2, &2, String, _ => String>>, +ns_flag: String, +rec_flag: String) -> Sigma<&2, &2, String, _ => String>:
+  match split:
+    case None{}:
+      (ns_flag, rec_flag)
+    case Some{pair}:
+      pair
+
+def resolve_pair_empty(is_empty: Bool, +ns_name: String, +rec_name: String) -> Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>:
+  match is_empty:
+    case True{}:
+      (True{}, (ns_name, rec_name))
+    case False{}:
+      (String.eq(rec_name, ""), (ns_name, rec_name))
+
+def resolve_check(+ns_name: String, +rec_name: String) -> Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>:
+  resolve_pair_empty(String.eq(ns_name, ""), ns_name, rec_name)
+
+def key_or_flags_pair(+pair: Sigma<&2, &2, String, _ => String>) -> Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>:
+  match pair:
+    case (ns_name, rec_name):
+      resolve_check(ns_name, rec_name)
+
+def key_or_flags_split(+split: Maybe<&2, Sigma<&2, &2, String, _ => String>>, +ns_flag: String, +rec_flag: String) -> Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>:
+  key_or_flags_pair(resolve_split(split, ns_flag, rec_flag))
+
+def key_or_flags(+sub_word: String, +ns_flag: String, +rec_flag: String) -> Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>:
+  key_or_flags_split(NsKey.split_key(sub_word), ns_flag, rec_flag)
+
+def parse_set_pair_ok(+pair: Sigma<&2, &2, String, _ => String>, +flag_map: Map<&2, String>) -> Command:
+  match pair:
+    case (ns_name, rec_name):
+      Set{flag_at(flag_map, "--session"), ns_name, rec_name, parse_source(flag_map), parse_parent_list(flag_at(flag_map, "--parent"))}
+
+def parse_set_pair(is_missing: Bool, +pair: Sigma<&2, &2, String, _ => String>, +flag_map: Map<&2, String>) -> Command:
+  match is_missing:
+    case True{}:
+      UsageError{"set-needs-key-ns/record"}
+    case False{}:
+      parse_set_pair_ok(pair, flag_map)
+
+def parse_set_resolved(+checked: Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>, +flag_map: Map<&2, String>) -> Command:
+  match checked:
+    case (is_missing, pair):
+      parse_set_pair(is_missing, pair, flag_map)
+
+def parse_is_set(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  parse_set_resolved(key_or_flags(sub_word, flag_at(flag_map, "--ns"), flag_at(flag_map, "--record")), flag_map)
+
+def parse_get_pair_ok(+pair: Sigma<&2, &2, String, _ => String>, +flag_map: Map<&2, String>) -> Command:
+  match pair:
+    case (ns_name, rec_name):
+      Get{ns_name, rec_name, flag_at(flag_map, "--at")}
+
+def parse_get_pair(is_missing: Bool, +pair: Sigma<&2, &2, String, _ => String>, +flag_map: Map<&2, String>) -> Command:
+  match is_missing:
+    case True{}:
+      UsageError{"get-needs-key-ns/record"}
+    case False{}:
+      parse_get_pair_ok(pair, flag_map)
+
+def parse_get_resolved(+checked: Sigma<&2, &2, Bool, _ => Sigma<&2, &2, String, _ => String>>, +flag_map: Map<&2, String>) -> Command:
+  match checked:
+    case (is_missing, pair):
+      parse_get_pair(is_missing, pair, flag_map)
+
+def parse_is_get(+sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  parse_get_resolved(key_or_flags(sub_word, flag_at(flag_map, "--ns"), flag_at(flag_map, "--record")), flag_map)
+
+def parse_is_log(+flag_map: Map<&2, String>) -> Command:
+  Log{flag_at(flag_map, "--limit")}
+
+def parse_is_status(+flag_map: Map<&2, String>) -> Command:
+  Status{flag_at(flag_map, "--session")}
+
+def parse_new_init(is_init: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_init:
+    case True{}:
+      Init{}
+    case False{}:
+      parse_dispatch(String.eq(head_word, "record"), String.eq(head_word, "commit"), String.eq(head_word, "certificate"), String.eq(head_word, "diff"), String.eq(head_word, "merge"), String.eq(head_word, "write"), String.eq(head_word, "compare"), String.eq(head_word, "merge-verify"), String.eq(head_word, "help"), sub_word, flag_map)
+
+def parse_new_status(is_status: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_status:
+    case True{}:
+      parse_is_status(flag_map)
+    case False{}:
+      parse_new_init(String.eq(head_word, "init"), head_word, sub_word, flag_map)
+
+def parse_new_log(is_log: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_log:
+    case True{}:
+      parse_is_log(flag_map)
+    case False{}:
+      parse_new_status(String.eq(head_word, "status"), head_word, sub_word, flag_map)
+
+def parse_new_get(is_get: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_get:
+    case True{}:
+      parse_is_get(sub_word, flag_map)
+    case False{}:
+      parse_new_log(String.eq(head_word, "log"), head_word, sub_word, flag_map)
+
+def parse_new_set(is_set: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_set:
+    case True{}:
+      parse_is_set(sub_word, flag_map)
+    case False{}:
+      parse_new_get(String.eq(head_word, "get"), head_word, sub_word, flag_map)
+
 def parse_split_empty(head_missing: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match head_missing:
     case True{}:
       UsageError{"empty-argv"}
     case False{}:
-      parse_dispatch(String.eq(head_word, "record"), String.eq(head_word, "commit"), String.eq(head_word, "certificate"), String.eq(head_word, "diff"), String.eq(head_word, "merge"), String.eq(head_word, "write"), String.eq(head_word, "compare"), String.eq(head_word, "merge-verify"), String.eq(head_word, "help"), sub_word, flag_map)
+      parse_new_set(String.eq(head_word, "set"), head_word, sub_word, flag_map)
 
 def parse_split_head_alias_h(is_h_flag: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_h_flag:
     case True{}:
-      parse_is_help(flag_map)
+      parse_is_help(sub_word, flag_map)
     case False{}:
       parse_split_empty(String.eq(head_word, ""), head_word, sub_word, flag_map)
+
+def parse_split_version_short(is_short: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_short:
+    case True{}:
+      Version{}
+    case False{}:
+      parse_split_head_alias_h(String.eq(head_word, "-h"), head_word, sub_word, flag_map)
+
+def parse_split_version_flag(is_version_flag: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_version_flag:
+    case True{}:
+      Version{}
+    case False{}:
+      parse_split_version_short(String.eq(head_word, "-V"), head_word, sub_word, flag_map)
+
+def parse_split_version(is_version: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
+  match is_version:
+    case True{}:
+      Version{}
+    case False{}:
+      parse_split_version_flag(String.eq(head_word, "--version"), head_word, sub_word, flag_map)
 
 def parse_split_head_alias(is_help_flag: Bool, +head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   match is_help_flag:
     case True{}:
-      parse_is_help(flag_map)
+      parse_is_help(sub_word, flag_map)
     case False{}:
-      parse_split_head_alias_h(String.eq(head_word, "-h"), head_word, sub_word, flag_map)
+      parse_split_version(String.eq(head_word, "version"), head_word, sub_word, flag_map)
 
 def parse_split_head(+head_word: String, +sub_word: String, +flag_map: Map<&2, String>) -> Command:
   parse_split_head_alias(String.eq(head_word, "--help"), head_word, sub_word, flag_map)
@@ -433,9 +584,9 @@ def parse_command(argv: List<String>) -> Command:
 def parse_opts_store_go(store_missing: Bool, +store_val: String, +flag_map: Map<&2, String>) -> GlobalOpts:
   match store_missing:
     case True{}:
-      Opts{"./.ber", flag_at(flag_map, "--session"), has_at(flag_map, "--json"), has_at(flag_map, "--colors"), has_at(flag_map, "--verbose")}
+      Opts{"./.ber", flag_at(flag_map, "--session"), has_at(flag_map, "--json"), has_at(flag_map, "--colors"), has_at(flag_map, "--verbose"), has_at(flag_map, "--no-colors")}
     case False{}:
-      Opts{store_val, flag_at(flag_map, "--session"), has_at(flag_map, "--json"), has_at(flag_map, "--colors"), has_at(flag_map, "--verbose")}
+      Opts{store_val, flag_at(flag_map, "--session"), has_at(flag_map, "--json"), has_at(flag_map, "--colors"), has_at(flag_map, "--verbose"), has_at(flag_map, "--no-colors")}
 
 def parse_opts_store(+store_val: String, +flag_map: Map<&2, String>) -> GlobalOpts:
   parse_opts_store_go(String.eq(store_val, ""), store_val, flag_map)
@@ -451,8 +602,60 @@ def parse_opts_split(+split: ArgvSplit) -> GlobalOpts:
 def parse_opts(argv: List<String>) -> GlobalOpts:
   parse_opts_split(args_to_split(argv))
 
-def usage_text(+topic: String) -> String:
+def usage_default(+topic: String) -> String:
   "ber record put --ns N --record R (--text T | --json J | --blob-hex H | --file F --kind K)\nber record get --ns N --record R --at COMMIT\nber diff --from A --to B [--verbose]\nber merge --first A --second B\nber --help"
+
+def usage_is_diff(is_diff: Bool, +topic: String) -> String:
+  match is_diff:
+    case True{}:
+      "Usage: ber diff --from A --to B [--verbose]\nCounts added/removed/modified keys; --verbose lists them.\nExample: ber diff --from $A --to $B --verbose"
+    case False{}:
+      usage_default(topic)
+
+def usage_is_merge(is_merge: Bool, +topic: String) -> String:
+  match is_merge:
+    case True{}:
+      "Usage: ber merge --first A --second B\nThree-way union-disjoint merge plus verification.\nOn conflict (exit 10): ber diff --from A --to B --verbose\nExample: ber merge --first $A --second $C"
+    case False{}:
+      usage_is_diff(String.eq(topic, "diff"), topic)
+
+def usage_is_init(is_init: Bool, +topic: String) -> String:
+  match is_init:
+    case True{}:
+      "Usage: ber init [--store DIR]\nCreates the store dir and prints a welcome header.\nExample: ber init --store ./.ber"
+    case False{}:
+      usage_is_merge(String.eq(topic, "merge"), topic)
+
+def usage_is_status(is_status: Bool, +topic: String) -> String:
+  match is_status:
+    case True{}:
+      "Usage: ber status [--session S]\nShows staged keys in the session not yet committed.\nExample: ber status --session ana"
+    case False{}:
+      usage_is_init(String.eq(topic, "init"), topic)
+
+def usage_is_log(is_log: Bool, +topic: String) -> String:
+  match is_log:
+    case True{}:
+      "Usage: ber log [--limit N]\nLists recent commits, newest first (short ids).\nExample: ber log --short"
+    case False{}:
+      usage_is_status(String.eq(topic, "status"), topic)
+
+def usage_is_get(is_get: Bool, +topic: String) -> String:
+  match is_get:
+    case True{}:
+      "Usage: ber get NS/RECORD [--at COMMIT]\nReads a value as of a commit; without --at reads HEAD.\nExample: ber get shop/limits --at <commit>\nOn absent (exit 30): check the key with ber log --short"
+    case False{}:
+      usage_is_log(String.eq(topic, "log"), topic)
+
+def usage_is_set(is_set: Bool, +topic: String) -> String:
+  match is_set:
+    case True{}:
+      "Usage: ber set NS/RECORD (--text T | --json J | --blob-hex H | --file F --kind K) [--session S] [--parent P]\nShortcut for write: stage and commit in one step.\nExample: ber set shop/limits --text \"hello\" --session ana\nOn failure: missing key needs NS/RECORD or --ns/--record (exit 2)"
+    case False{}:
+      usage_is_get(String.eq(topic, "get"), topic)
+
+def usage_text(+topic: String) -> String:
+  usage_is_set(String.eq(topic, "set"), topic)
 
 # Both halves from one argv pass: the split is Data so it can be reused.
 def parse_both_go(+split: ArgvSplit) -> Sigma<&2, &2, GlobalOpts, _ => Command>:
