@@ -32,8 +32,8 @@ Prerequisites: [Bend](https://bend-lang.com) >= 2.0.32 (`bend version`).
 
 ```bash
 git clone git@github.com:FabianVegaA/ber-cli.git && cd ber-cli
-bend cli.bend -o ber        # build the binary (./ber)
-export PATH="$PWD:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
+mkdir -p bin && bend cli.bend -o bin/ber        # build the binary (./ber)
+export PATH="$PWD/bin:$PATH"    # use `ber` directly (or: cp ber ~/.local/bin/)
 ber --version               # check the install: ber-cli 0.2.2.0
 ```
 
